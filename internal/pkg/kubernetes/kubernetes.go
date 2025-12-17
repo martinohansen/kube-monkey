@@ -8,6 +8,7 @@ package kubernetes
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/golang/glog"
 
@@ -16,11 +17,13 @@ import (
 	"k8s.io/client-go/discovery"
 	kube "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/homedir"
 )
 
 // CreateClient creates, verifies and returns an instance of k8 clientset
 func CreateClient() (*kube.Clientset, error) {
-	client, err := NewInClusterClient()
+	client, err := NewClusterClient()
 	if err != nil {
 		return nil, fmt.Errorf("Failed to generate NewInClusterClient: %v", err)
 	}
@@ -31,12 +34,21 @@ func CreateClient() (*kube.Clientset, error) {
 	return nil, fmt.Errorf("Unable to verify client connectivity to Kubernetes apiserver")
 }
 
-// NewInClusterClient only creates an initialized instance of k8 clientset
-func NewInClusterClient() (*kube.Clientset, error) {
+// NewClusterClient only creates an initialized instance of k8 clientset
+func NewClusterClient() (*kube.Clientset, error) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
-		glog.Errorf("failed to obtain config from InClusterConfig: %v", err)
-		return nil, err
+		if err == rest.ErrNotInCluster {
+			// Attempt to use out of cluster config
+			config, err = clientcmd.BuildConfigFromFlags("", filepath.Join(homedir.HomeDir(), ".kube", "config"))
+			if err != nil {
+				glog.Errorf("failed to obtain config from kubeconfig file: %v", err)
+				return nil, err
+			}
+		} else {
+			glog.Errorf("failed to obtain config from InClusterConfig: %v", err)
+			return nil, err
+		}
 	}
 
 	if apiserverHost, override := cfg.ClusterAPIServerHost(); override {

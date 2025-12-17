@@ -87,6 +87,7 @@ func setupWatch() {
 
 func Init() error {
 	SetDefaults()
+	viper.AddConfigPath(".")
 	viper.AddConfigPath(configpath)
 	viper.SetConfigType(configtype)
 	viper.SetConfigName(configname)

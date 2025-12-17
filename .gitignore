@@ -6,3 +6,4 @@ kube-monkey
 bin/
 .vscode/
 .DS_Store
+config.toml
