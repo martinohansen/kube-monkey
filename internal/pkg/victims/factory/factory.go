@@ -11,6 +11,7 @@ import (
 	"kube-monkey/internal/pkg/config"
 	"kube-monkey/internal/pkg/kubernetes"
 	"kube-monkey/internal/pkg/victims"
+	"kube-monkey/internal/pkg/victims/factory/cnpg.io/postgresql/clusters"
 	"kube-monkey/internal/pkg/victims/factory/daemonsets"
 	"kube-monkey/internal/pkg/victims/factory/deployments"
 	"kube-monkey/internal/pkg/victims/factory/statefulsets"
@@ -27,7 +28,7 @@ import (
 // each victim checks themselves against the ns blacklist
 // TODO: fetch all namespaces from k8 apiserver to check blacklist here
 func EligibleVictims() (eligibleVictims []victims.Victim, err error) {
-	clientset, err := kubernetes.CreateClient()
+	clientset, dynamicClient, err := kubernetes.CreateClient()
 	if err != nil {
 		return nil, err
 	}
@@ -65,6 +66,17 @@ func EligibleVictims() (eligibleVictims []victims.Victim, err error) {
 			continue
 		}
 		eligibleVictims = append(eligibleVictims, daemonsets...)
+
+		// Fetch CNPG clusters (if dynamic client available)
+		if dynamicClient != nil {
+			cnpgClusters, err := clusters.EligibleClusters(dynamicClient, namespace, filter)
+			if err != nil {
+				//allow pass through to schedule other kinds and namespaces
+				glog.Warningf("Failed to fetch eligible CNPG clusters for namespace %s due to error: %s", namespace, err.Error())
+			} else {
+				eligibleVictims = append(eligibleVictims, cnpgClusters...)
+			}
+		}
 	}
 
 	return

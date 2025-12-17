@@ -15,6 +15,7 @@ import (
 	cfg "kube-monkey/internal/pkg/config"
 
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
 	kube "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -22,20 +23,20 @@ import (
 )
 
 // CreateClient creates, verifies and returns an instance of k8 clientset
-func CreateClient() (*kube.Clientset, error) {
-	client, err := NewClusterClient()
+func CreateClient() (*kube.Clientset, dynamic.Interface, error) {
+	client, dynamicClient, err := NewClusterClient()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to generate NewInClusterClient: %v", err)
+		return nil, nil, fmt.Errorf("Failed to generate NewInClusterClient: %v", err)
 	}
 
 	if VerifyClient(client) {
-		return client, nil
+		return client, dynamicClient, nil
 	}
-	return nil, fmt.Errorf("Unable to verify client connectivity to Kubernetes apiserver")
+	return nil, nil, fmt.Errorf("Unable to verify client connectivity to Kubernetes apiserver")
 }
 
 // NewClusterClient only creates an initialized instance of k8 clientset
-func NewClusterClient() (*kube.Clientset, error) {
+func NewClusterClient() (*kube.Clientset, dynamic.Interface, error) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		if err == rest.ErrNotInCluster {
@@ -43,11 +44,11 @@ func NewClusterClient() (*kube.Clientset, error) {
 			config, err = clientcmd.BuildConfigFromFlags("", filepath.Join(homedir.HomeDir(), ".kube", "config"))
 			if err != nil {
 				glog.Errorf("failed to obtain config from kubeconfig file: %v", err)
-				return nil, err
+				return nil, nil, err
 			}
 		} else {
 			glog.Errorf("failed to obtain config from InClusterConfig: %v", err)
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
@@ -59,9 +60,14 @@ func NewClusterClient() (*kube.Clientset, error) {
 	clientset, err := kube.NewForConfig(config)
 	if err != nil {
 		glog.Errorf("failed to create clientset in NewForConfig: %v", err)
-		return nil, err
+		return nil, nil, err
 	}
-	return clientset, nil
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		glog.Errorf("failed to create dynamic client: %v", err)
+		return nil, nil, err
+	}
+	return clientset, dynamicClient, nil
 }
 
 func VerifyClient(client discovery.DiscoveryInterface) bool {

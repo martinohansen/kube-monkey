@@ -29,7 +29,7 @@ func durationToNextRun(runhour int, loc *time.Location) time.Duration {
 func Run() error {
 	// Verify kubernetes client can be created and works before
 	// we enter execution loop
-	if _, err := kubernetes.CreateClient(); err != nil {
+	if _, _, err := kubernetes.CreateClient(); err != nil {
 		return err
 	}
 

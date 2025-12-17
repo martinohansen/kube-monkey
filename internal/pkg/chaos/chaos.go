@@ -50,7 +50,7 @@ func (c *Chaos) DurationToKillTime() time.Duration {
 // The result is sent back over the channel provided
 func (c *Chaos) Execute(resultchan chan<- *Result) {
 	// Create kubernetes clientset
-	clientset, err := kubernetes.CreateClient()
+	clientset, _, err := kubernetes.CreateClient()
 	if err != nil {
 		resultchan <- c.NewResult(err)
 		return
