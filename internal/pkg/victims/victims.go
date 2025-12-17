@@ -12,8 +12,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
 
-	kube "k8s.io/client-go/kubernetes"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -40,26 +38,26 @@ type VictimBaseTemplate interface {
 
 type VictimSpecificAPICalls interface {
 	// Depends on which version i.e. apps/v1 or extensions/v1beta2
-	IsEnrolled(kube.Interface) (bool, error) // Get updated enroll status
-	KillType(kube.Interface) (string, error) // Get updated kill config type
-	KillValue(kube.Interface) (int, error)   // Get updated kill config value
+	IsEnrolled(VictimKubeClient) (bool, error) // Get updated enroll status
+	KillType(VictimKubeClient) (string, error) // Get updated kill config type
+	KillValue(VictimKubeClient) (int, error)   // Get updated kill config value
 }
 
 type VictimAPICalls interface {
 	// Exposed Api Calls
-	RunningPods(kube.Interface) ([]corev1.Pod, error)
-	Pods(kube.Interface) ([]corev1.Pod, error)
-	DeletePod(kube.Interface, string) error
-	DeleteRandomPod(kube.Interface) error // Deprecated, but faster than DeleteRandomPods for single pod termination
-	DeleteRandomPods(kube.Interface, int) error
+	RunningPods(VictimKubeClient) ([]corev1.Pod, error)
+	Pods(VictimKubeClient) ([]corev1.Pod, error)
+	DeletePod(VictimKubeClient, string) error
+	DeleteRandomPod(VictimKubeClient) error // Deprecated, but faster than DeleteRandomPods for single pod termination
+	DeleteRandomPods(VictimKubeClient, int) error
 	IsBlacklisted() bool
 	IsWhitelisted() bool
 }
 
 type VictimKillNumberGenerator interface {
-	KillNumberForMaxPercentage(kube.Interface, int) (int, error)
-	KillNumberForKillingAll(kube.Interface) (int, error)
-	KillNumberForFixedPercentage(kube.Interface, int) (int, error)
+	KillNumberForMaxPercentage(VictimKubeClient, int) (int, error)
+	KillNumberForKillingAll(VictimKubeClient) (int, error)
+	KillNumberForFixedPercentage(VictimKubeClient, int) (int, error)
 }
 
 type VictimBase struct {
@@ -97,8 +95,8 @@ func (v *VictimBase) Mtbf() int {
 }
 
 // RunningPods returns a list of running pods for the victim
-func (v *VictimBase) RunningPods(clientset kube.Interface) (runningPods []corev1.Pod, err error) {
-	pods, err := v.Pods(clientset)
+func (v *VictimBase) RunningPods(client VictimKubeClient) (runningPods []corev1.Pod, err error) {
+	pods, err := v.Pods(client)
 	if err != nil {
 		return nil, err
 	}
@@ -113,13 +111,13 @@ func (v *VictimBase) RunningPods(clientset kube.Interface) (runningPods []corev1
 }
 
 // Pods returns a list of pods under the victim
-func (v *VictimBase) Pods(clientset kube.Interface) ([]corev1.Pod, error) {
+func (v *VictimBase) Pods(client VictimKubeClient) ([]corev1.Pod, error) {
 	labelSelector, err := labelFilterForPods(v.identifier)
 	if err != nil {
 		return nil, err
 	}
 
-	podlist, err := clientset.CoreV1().Pods(v.namespace).List(context.TODO(), *labelSelector)
+	podlist, err := client.Kube().CoreV1().Pods(v.namespace).List(context.TODO(), *labelSelector)
 	if err != nil {
 		return nil, err
 	}
@@ -127,14 +125,14 @@ func (v *VictimBase) Pods(clientset kube.Interface) ([]corev1.Pod, error) {
 }
 
 // DeletePod removes specified pod for victim
-func (v *VictimBase) DeletePod(clientset kube.Interface, podName string) error {
+func (v *VictimBase) DeletePod(client VictimKubeClient, podName string) error {
 	if config.DryRun() {
 		glog.Infof("[DryRun Mode] Terminated pod %s for %s/%s", podName, v.namespace, v.name)
 		return nil
 	}
 
 	deleteOpts := v.GetDeleteOptsForPod()
-	return clientset.CoreV1().Pods(v.namespace).Delete(context.TODO(), podName, *deleteOpts)
+	return client.Kube().CoreV1().Pods(v.namespace).Delete(context.TODO(), podName, *deleteOpts)
 }
 
 // Creates the DeleteOptions object
@@ -148,9 +146,9 @@ func (v *VictimBase) GetDeleteOptsForPod() *metav1.DeleteOptions {
 }
 
 // DeleteRandomPods removes specified number of random pods for the victim
-func (v *VictimBase) DeleteRandomPods(clientset kube.Interface, killNum int) error {
+func (v *VictimBase) DeleteRandomPods(client VictimKubeClient, killNum int) error {
 	// Pick a target pod to delete
-	pods, err := v.RunningPods(clientset)
+	pods, err := v.RunningPods(client)
 	if err != nil {
 		return err
 	}
@@ -182,7 +180,7 @@ func (v *VictimBase) DeleteRandomPods(clientset kube.Interface, killNum int) err
 
 		glog.V(6).Infof("Terminating pod %s for %s %s/%s\n", targetPod, v.kind, v.namespace, v.name)
 
-		err = v.DeletePod(clientset, targetPod)
+		err = v.DeletePod(client, targetPod)
 		if err != nil {
 			return err
 		}
@@ -194,9 +192,9 @@ func (v *VictimBase) DeleteRandomPods(clientset kube.Interface, killNum int) err
 
 // Deprecated for DeleteRandomPods(clientset, 1)
 // Remove a random pod for the victim
-func (v *VictimBase) DeleteRandomPod(clientset kube.Interface) error {
+func (v *VictimBase) DeleteRandomPod(client VictimKubeClient) error {
 	// Pick a target pod to delete
-	pods, err := v.RunningPods(clientset)
+	pods, err := v.RunningPods(client)
 	if err != nil {
 		return err
 	}
@@ -208,7 +206,7 @@ func (v *VictimBase) DeleteRandomPod(clientset kube.Interface) error {
 	targetPod := RandomPodName(pods)
 
 	glog.V(6).Infof("Terminating pod %s for %s %s\n", targetPod, v.kind, v.name)
-	return v.DeletePod(clientset, targetPod)
+	return v.DeletePod(client, targetPod)
 }
 
 // IsBlacklisted checks if this victim is blacklisted
@@ -255,8 +253,8 @@ func RandomPodName(pods []corev1.Pod) string {
 }
 
 // KillNumberForKillingAll returns the number of pods to kill based on the number of all running pods
-func (v *VictimBase) KillNumberForKillingAll(clientset kube.Interface) (int, error) {
-	killNum, err := v.numberOfRunningPods(clientset)
+func (v *VictimBase) KillNumberForKillingAll(client VictimKubeClient) (int, error) {
+	killNum, err := v.numberOfRunningPods(client)
 	if err != nil {
 		return 0, err
 	}
@@ -265,7 +263,7 @@ func (v *VictimBase) KillNumberForKillingAll(clientset kube.Interface) (int, err
 }
 
 // KillNumberForFixedPercentage returns the number of pods to kill based on a kill percentage and the number of running pods
-func (v *VictimBase) KillNumberForFixedPercentage(clientset kube.Interface, killPercentage int) (int, error) {
+func (v *VictimBase) KillNumberForFixedPercentage(client VictimKubeClient, killPercentage int) (int, error) {
 	if killPercentage == 0 {
 		glog.V(6).Infof("Not terminating any pods for %s %s as kill percentage is 0\n", v.kind, v.name)
 		// Report success
@@ -275,7 +273,7 @@ func (v *VictimBase) KillNumberForFixedPercentage(clientset kube.Interface, kill
 		return 0, fmt.Errorf("percentage value of %d is invalid. Must be [0-100]", killPercentage)
 	}
 
-	numRunningPods, err := v.numberOfRunningPods(clientset)
+	numRunningPods, err := v.numberOfRunningPods(client)
 	if err != nil {
 		return 0, err
 	}
@@ -287,7 +285,7 @@ func (v *VictimBase) KillNumberForFixedPercentage(clientset kube.Interface, kill
 }
 
 // KillNumberForMaxPercentage returns a number of pods to kill based on a a random kill percentage (between 0 and maxPercentage) and the number of running pods
-func (v *VictimBase) KillNumberForMaxPercentage(clientset kube.Interface, maxPercentage int) (int, error) {
+func (v *VictimBase) KillNumberForMaxPercentage(client VictimKubeClient, maxPercentage int) (int, error) {
 	if maxPercentage == 0 {
 		glog.V(6).Infof("Not terminating any pods for %s %s as kill percentage is 0", v.kind, v.name)
 		// Report success
@@ -297,7 +295,7 @@ func (v *VictimBase) KillNumberForMaxPercentage(clientset kube.Interface, maxPer
 		return 0, fmt.Errorf("percentage value of %d is invalid. Must be [0-100]", maxPercentage)
 	}
 
-	numRunningPods, err := v.numberOfRunningPods(clientset)
+	numRunningPods, err := v.numberOfRunningPods(client)
 	if err != nil {
 		return 0, err
 	}
@@ -311,8 +309,8 @@ func (v *VictimBase) KillNumberForMaxPercentage(clientset kube.Interface, maxPer
 }
 
 // Returns the number of running pods or 0 if the operation fails
-func (v *VictimBase) numberOfRunningPods(clientset kube.Interface) (int, error) {
-	pods, err := v.RunningPods(clientset)
+func (v *VictimBase) numberOfRunningPods(client VictimKubeClient) (int, error) {
+	pods, err := v.RunningPods(client)
 	if err != nil {
 		return 0, errors.Wrapf(err, "Failed to get running pods for victim %s %s", v.kind, v.name)
 	}

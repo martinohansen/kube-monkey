@@ -67,11 +67,10 @@ func EligibleVictims() (eligibleVictims []victims.Victim, err error) {
 		}
 		eligibleVictims = append(eligibleVictims, daemonsets...)
 
-		// Fetch CNPG clusters (if dynamic client available)
-		if dynamicClient != nil {
+		// Fetch CNPG clusters if CRD is available
+		if eligible := clusters.IsEligible(dynamicClient); eligible {
 			cnpgClusters, err := clusters.EligibleClusters(dynamicClient, namespace, filter)
 			if err != nil {
-				//allow pass through to schedule other kinds and namespaces
 				glog.Warningf("Failed to fetch eligible CNPG clusters for namespace %s due to error: %s", namespace, err.Error())
 			} else {
 				eligibleVictims = append(eligibleVictims, cnpgClusters...)

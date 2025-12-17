@@ -62,6 +62,10 @@ func newVictimBase() *VictimBase {
 	return New(KIND, NAME, NAMESPACE, IDENTIFIER, 1)
 }
 
+func newVictimClient(client kube.Interface) VictimKubeClient {
+	return NewVictimClient(client, nil)
+}
+
 func getPodList(client kube.Interface) *corev1.PodList {
 	podList, _ := client.CoreV1().Pods(NAMESPACE).List(context.TODO(), metav1.ListOptions{})
 	return podList
@@ -86,7 +90,7 @@ func TestRunningPods(t *testing.T) {
 
 	client := fake.NewSimpleClientset(&pod1, &pod2)
 
-	podList, err := v.RunningPods(client)
+	podList, err := v.RunningPods(newVictimClient(client))
 
 	assert.NoError(t, err)
 	assert.Lenf(t, podList, 1, "Expected 1 item in podList, got %d", len(podList))
@@ -103,7 +107,7 @@ func TestPods(t *testing.T) {
 
 	client := fake.NewSimpleClientset(&pod1, &pod2)
 
-	podList, _ := v.Pods(client)
+	podList, _ := v.Pods(newVictimClient(client))
 
 	assert.Lenf(t, podList, 2, "Expected 2 items in podList, got %d", len(podList))
 }
@@ -115,7 +119,7 @@ func TestDeletePod(t *testing.T) {
 
 	client := fake.NewSimpleClientset(&pod)
 
-	err := v.DeletePod(client, "app")
+	err := v.DeletePod(newVictimClient(client), "app")
 	assert.NoError(t, err)
 
 	podList := getPodList(client).Items
@@ -133,23 +137,23 @@ func TestDeleteRandomPods(t *testing.T) {
 	podList := getPodList(client).Items
 	assert.Lenf(t, podList, 3, "Expected 3 items in podList, got %d", len(podList))
 
-	err := v.DeleteRandomPods(client, 0)
+	err := v.DeleteRandomPods(newVictimClient(client), 0)
 	assert.NotNil(t, err, "expected err for killNum=0 but got nil")
 
-	err = v.DeleteRandomPods(client, -1)
+	err = v.DeleteRandomPods(newVictimClient(client), -1)
 	assert.NotNil(t, err, "expected err for negative terminations but got nil")
 
-	_ = v.DeleteRandomPods(client, 1)
+	_ = v.DeleteRandomPods(newVictimClient(client), 1)
 	podList = getPodList(client).Items
 	assert.Lenf(t, podList, 2, "Expected 2 items in podList, got %d", len(podList))
 
-	_ = v.DeleteRandomPods(client, 2)
+	_ = v.DeleteRandomPods(newVictimClient(client), 2)
 	podList = getPodList(client).Items
 	assert.Lenf(t, podList, 1, "Expected 1 item in podList, got %d", len(podList))
 	name := podList[0].GetName()
 	assert.Equalf(t, name, "app2", "Expected not running pods not be deleted")
 
-	err = v.DeleteRandomPods(client, 2)
+	err = v.DeleteRandomPods(newVictimClient(client), 2)
 	assert.EqualError(t, err, KIND+" "+NAME+" has no running pods at the moment")
 }
 
@@ -161,7 +165,7 @@ func TestKillNumberForMaxPercentage(t *testing.T) {
 
 	client := fake.NewSimpleClientset(pods...)
 
-	killNum, err := v.KillNumberForMaxPercentage(client, 50) // 50% means we kill between at most 50 pods of the 100 that are running
+	killNum, err := v.KillNumberForMaxPercentage(newVictimClient(client), 50) // 50% means we kill between at most 50 pods of the 100 that are running
 	assert.Nil(t, err, "Expected err to be nil but got %v", err)
 	assert.Truef(t, killNum >= 0 && killNum <= 50, "Expected kill number between 0 and 50 pods, got %d", killNum)
 }
@@ -199,7 +203,7 @@ func TestKillNumberForMaxPercentageInvalidValues(t *testing.T) {
 		v := newVictimBase()
 		client := fake.NewSimpleClientset()
 
-		result, err := v.KillNumberForMaxPercentage(client, tc.maxPercentage)
+		result, err := v.KillNumberForMaxPercentage(newVictimClient(client), tc.maxPercentage)
 
 		if tc.expectedErr {
 			assert.NotNil(t, err, tc.name)
@@ -267,7 +271,7 @@ func TestDeletePodsFixedPercentage(t *testing.T) {
 		client := fake.NewSimpleClientset(tc.pods...)
 		v := newVictimBase()
 
-		result, err := v.KillNumberForFixedPercentage(client, tc.killPercentage)
+		result, err := v.KillNumberForFixedPercentage(newVictimClient(client), tc.killPercentage)
 
 		if tc.expectedErr {
 			assert.NotNil(t, err, tc.name)
@@ -287,11 +291,11 @@ func TestDeleteRandomPod(t *testing.T) {
 
 	client := fake.NewSimpleClientset(&pod1, &pod2)
 
-	_ = v.DeleteRandomPod(client)
+	_ = v.DeleteRandomPod(newVictimClient(client))
 	podList := getPodList(client).Items
 	assert.Len(t, podList, 1)
 
-	err := v.DeleteRandomPods(client, 2)
+	err := v.DeleteRandomPods(newVictimClient(client), 2)
 	assert.EqualError(t, err, KIND+" "+NAME+" has no running pods at the moment")
 }
 

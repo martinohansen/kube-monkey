@@ -14,7 +14,6 @@ type Cluster struct {
 	*victims.VictimBase
 }
 
-// New creates a new instance of Cluster from an unstructured object
 func New(obj *unstructured.Unstructured) (*Cluster, error) {
 	ident, err := identifier(obj)
 	if err != nil {
@@ -32,11 +31,6 @@ func New(obj *unstructured.Unstructured) (*Cluster, error) {
 	return &Cluster{VictimBase: victims.New(kind, name, namespace, ident, mtbf)}, nil
 }
 
-// Returns the value of the label defined by config.IdentLabelKey
-// from the cluster labels
-// This label should be unique to a cluster, and is used to
-// identify the pods that belong to this cluster, as pods
-// inherit labels from the Cluster
 func identifier(obj *unstructured.Unstructured) (string, error) {
 	labels := obj.GetLabels()
 	identifier, ok := labels[config.IdentLabelKey]
@@ -46,8 +40,6 @@ func identifier(obj *unstructured.Unstructured) (string, error) {
 	return identifier, nil
 }
 
-// Read the mean-time-between-failures value defined by the Cluster
-// in the label defined by config.MtbfLabelKey
 func meanTimeBetweenFailures(obj *unstructured.Unstructured) (int, error) {
 	labels := obj.GetLabels()
 	mtbf, ok := labels[config.MtbfLabelKey]
@@ -61,7 +53,7 @@ func meanTimeBetweenFailures(obj *unstructured.Unstructured) (int, error) {
 	}
 
 	if !(mtbfInt > 0) {
-		return -1, fmt.Errorf("Invalid value for label %s: %d", config.MtbfLabelKey, mtbfInt)
+		return -1, fmt.Errorf("invalid value for label %s: %d", config.MtbfLabelKey, mtbfInt)
 	}
 
 	return mtbfInt, nil

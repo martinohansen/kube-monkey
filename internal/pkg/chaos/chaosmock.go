@@ -7,7 +7,6 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kube "k8s.io/client-go/kubernetes"
 )
 
 const (
@@ -19,46 +18,46 @@ const (
 
 type VictimMock struct {
 	mock.Mock
-	victims.VictimBase
+	*victims.VictimBase
 }
 
-func (vm *VictimMock) IsEnrolled(clientset kube.Interface) (bool, error) {
-	args := vm.Called(clientset)
+func (vm *VictimMock) IsEnrolled(client victims.VictimKubeClient) (bool, error) {
+	args := vm.Called(client)
 	return args.Bool(0), args.Error(1)
 }
 
-func (vm *VictimMock) KillType(clientset kube.Interface) (string, error) {
-	args := vm.Called(clientset)
+func (vm *VictimMock) KillType(client victims.VictimKubeClient) (string, error) {
+	args := vm.Called(client)
 	return args.String(0), args.Error(1)
 }
 
-func (vm *VictimMock) KillValue(clientset kube.Interface) (int, error) {
-	args := vm.Called(clientset)
+func (vm *VictimMock) KillValue(client victims.VictimKubeClient) (int, error) {
+	args := vm.Called(client)
 	return args.Int(0), args.Error(1)
 }
 
-func (vm *VictimMock) DeleteRandomPod(clientset kube.Interface) error {
-	args := vm.Called(clientset)
+func (vm *VictimMock) DeleteRandomPod(client victims.VictimKubeClient) error {
+	args := vm.Called(client)
 	return args.Error(0)
 }
 
-func (vm *VictimMock) DeleteRandomPods(clientset kube.Interface, killValue int) error {
-	args := vm.Called(clientset, killValue)
+func (vm *VictimMock) DeleteRandomPods(client victims.VictimKubeClient, killValue int) error {
+	args := vm.Called(client, killValue)
 	return args.Error(0)
 }
 
-func (vm *VictimMock) KillNumberForKillingAll(clientset kube.Interface) (int, error) {
-	args := vm.Called(clientset)
+func (vm *VictimMock) KillNumberForKillingAll(client victims.VictimKubeClient) (int, error) {
+	args := vm.Called(client)
 	return args.Int(0), args.Error(1)
 }
 
-func (vm *VictimMock) KillNumberForMaxPercentage(clientset kube.Interface, killValue int) (int, error) {
-	args := vm.Called(clientset, killValue)
+func (vm *VictimMock) KillNumberForMaxPercentage(client victims.VictimKubeClient, killValue int) (int, error) {
+	args := vm.Called(client, killValue)
 	return args.Int(0), args.Error(1)
 }
 
-func (vm *VictimMock) KillNumberForFixedPercentage(clientset kube.Interface, killValue int) (int, error) {
-	args := vm.Called(clientset, killValue)
+func (vm *VictimMock) KillNumberForFixedPercentage(client victims.VictimKubeClient, killValue int) (int, error) {
+	args := vm.Called(client, killValue)
 	return args.Int(0), args.Error(1)
 }
 
@@ -75,7 +74,7 @@ func (vm *VictimMock) IsWhitelisted() bool {
 func NewVictimMock() *VictimMock {
 	v := victims.New(KIND, NAME, NAMESPACE, IDENTIFIER, 1)
 	return &VictimMock{
-		VictimBase: *v,
+		VictimBase: v,
 	}
 }
 

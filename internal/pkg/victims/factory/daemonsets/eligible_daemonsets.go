@@ -47,8 +47,8 @@ func EligibleDaemonSets(clientset kube.Interface, namespace string, filter *meta
 /* Below methods are used to verify the victim's attributes have not changed at the scheduled time of termination */
 
 // IsEnrolled checks if the daemonset is currently enrolled in kube-monkey
-func (d *DaemonSet) IsEnrolled(clientset kube.Interface) (bool, error) {
-	daemonset, err := clientset.AppsV1().DaemonSets(d.Namespace()).Get(context.TODO(), d.Name(), metav1.GetOptions{})
+func (d *DaemonSet) IsEnrolled(client victims.VictimKubeClient) (bool, error) {
+	daemonset, err := client.Kube().AppsV1().DaemonSets(d.Namespace()).Get(context.TODO(), d.Name(), metav1.GetOptions{})
 	if err != nil {
 		return false, err
 	}
@@ -56,8 +56,8 @@ func (d *DaemonSet) IsEnrolled(clientset kube.Interface) (bool, error) {
 }
 
 // KillType returns current killtype config label for update
-func (d *DaemonSet) KillType(clientset kube.Interface) (string, error) {
-	daemonset, err := clientset.AppsV1().DaemonSets(d.Namespace()).Get(context.TODO(), d.Name(), metav1.GetOptions{})
+func (d *DaemonSet) KillType(client victims.VictimKubeClient) (string, error) {
+	daemonset, err := client.Kube().AppsV1().DaemonSets(d.Namespace()).Get(context.TODO(), d.Name(), metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -71,8 +71,8 @@ func (d *DaemonSet) KillType(clientset kube.Interface) (string, error) {
 }
 
 // KillValue returns current killvalue config label for update
-func (d *DaemonSet) KillValue(clientset kube.Interface) (int, error) {
-	daemonset, err := clientset.AppsV1().DaemonSets(d.Namespace()).Get(context.TODO(), d.Name(), metav1.GetOptions{})
+func (d *DaemonSet) KillValue(client victims.VictimKubeClient) (int, error) {
+	daemonset, err := client.Kube().AppsV1().DaemonSets(d.Namespace()).Get(context.TODO(), d.Name(), metav1.GetOptions{})
 	if err != nil {
 		return -1, err
 	}

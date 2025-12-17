@@ -23,6 +23,12 @@ var clusterGVR = schema.GroupVersionResource{
 	Version:  "v1",
 }
 
+// IsEligible checks if the CNPG Cluster CRD is available in the cluster
+func IsEligible(dynamicClient dynamic.Interface) bool {
+	_, err := dynamicClient.Resource(clusterGVR).List(context.TODO(), metav1.ListOptions{Limit: 1})
+	return err == nil
+}
+
 func EligibleClusters(dynamicClient dynamic.Interface, namespace string, filter *metav1.ListOptions) (eligVictims []victims.Victim, err error) {
 	unstructuredList, err := dynamicClient.Resource(clusterGVR).Namespace(namespace).List(context.TODO(), *filter)
 	if err != nil {
@@ -47,8 +53,8 @@ func EligibleClusters(dynamicClient dynamic.Interface, namespace string, filter 
 	return
 }
 
-func (c *Cluster) IsEnrolled(dynamicClient dynamic.Interface) (bool, error) {
-	obj, err := dynamicClient.Resource(clusterGVR).Namespace(c.Namespace()).Get(context.TODO(), c.Name(), metav1.GetOptions{})
+func (c *Cluster) IsEnrolled(client victims.VictimKubeClient) (bool, error) {
+	obj, err := client.Dynamic().Resource(clusterGVR).Namespace(c.Namespace()).Get(context.TODO(), c.Name(), metav1.GetOptions{})
 	if err != nil {
 		return false, err
 	}
@@ -57,8 +63,8 @@ func (c *Cluster) IsEnrolled(dynamicClient dynamic.Interface) (bool, error) {
 	return labels[config.EnabledLabelKey] == config.EnabledLabelValue, nil
 }
 
-func (c *Cluster) KillType(dynamicClient dynamic.Interface) (string, error) {
-	obj, err := dynamicClient.Resource(clusterGVR).Namespace(c.Namespace()).Get(context.TODO(), c.Name(), metav1.GetOptions{})
+func (c *Cluster) KillType(client victims.VictimKubeClient) (string, error) {
+	obj, err := client.Dynamic().Resource(clusterGVR).Namespace(c.Namespace()).Get(context.TODO(), c.Name(), metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -72,8 +78,8 @@ func (c *Cluster) KillType(dynamicClient dynamic.Interface) (string, error) {
 	return killType, nil
 }
 
-func (c *Cluster) KillValue(dynamicClient dynamic.Interface) (int, error) {
-	obj, err := dynamicClient.Resource(clusterGVR).Namespace(c.Namespace()).Get(context.TODO(), c.Name(), metav1.GetOptions{})
+func (c *Cluster) KillValue(client victims.VictimKubeClient) (int, error) {
+	obj, err := client.Dynamic().Resource(clusterGVR).Namespace(c.Namespace()).Get(context.TODO(), c.Name(), metav1.GetOptions{})
 	if err != nil {
 		return -1, err
 	}

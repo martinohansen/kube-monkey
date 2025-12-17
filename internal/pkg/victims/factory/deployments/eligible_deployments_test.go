@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"kube-monkey/internal/pkg/config"
+	"kube-monkey/internal/pkg/victims"
 
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,7 +40,7 @@ func TestIsEnrolled(t *testing.T) {
 
 	client := fake.NewSimpleClientset(&v1depl)
 
-	b, _ := depl.IsEnrolled(client)
+	b, _ := depl.IsEnrolled(victims.NewVictimClient(client, nil))
 
 	assert.Equal(t, b, true, "Expected deployment to be enrolled")
 }
@@ -58,7 +59,7 @@ func TestIsNotEnrolled(t *testing.T) {
 
 	client := fake.NewSimpleClientset(&v1depl)
 
-	b, _ := depl.IsEnrolled(client)
+	b, _ := depl.IsEnrolled(victims.NewVictimClient(client, nil))
 
 	assert.Equal(t, b, false, "Expected deployment to not be enrolled")
 }
@@ -81,7 +82,7 @@ func TestKillType(t *testing.T) {
 
 	client := fake.NewSimpleClientset(&v1depl)
 
-	_, err := depl.KillType(client)
+	_, err := depl.KillType(victims.NewVictimClient(client, nil))
 
 	assert.EqualError(t, err, depl.Kind()+" "+depl.Name()+" does not have "+config.KillTypeLabelKey+" label")
 
@@ -96,7 +97,7 @@ func TestKillType(t *testing.T) {
 
 	client = fake.NewSimpleClientset(&v1depl)
 
-	kill, _ := depl.KillType(client)
+	kill, _ := depl.KillType(victims.NewVictimClient(client, nil))
 
 	assert.Equal(t, kill, killMode, "Unexpected kill value, got %d", kill)
 }
@@ -119,7 +120,7 @@ func TestKillValue(t *testing.T) {
 
 	client := fake.NewSimpleClientset(&v1depl)
 
-	_, err := depl.KillValue(client)
+	_, err := depl.KillValue(victims.NewVictimClient(client, nil))
 
 	assert.EqualError(t, err, depl.Kind()+" "+depl.Name()+" does not have "+config.KillValueLabelKey+" label")
 
@@ -134,7 +135,7 @@ func TestKillValue(t *testing.T) {
 
 	client = fake.NewSimpleClientset(&v1depl)
 
-	_, err = depl.KillValue(client)
+	_, err = depl.KillValue(victims.NewVictimClient(client, nil))
 
 	assert.EqualError(t, err, "Invalid value for label "+config.KillValueLabelKey+": "+killValue)
 
@@ -151,7 +152,7 @@ func TestKillValue(t *testing.T) {
 
 	client = fake.NewSimpleClientset(&v1depl)
 
-	kill, _ := depl.KillValue(client)
+	kill, _ := depl.KillValue(victims.NewVictimClient(client, nil))
 
 	assert.Equalf(t, kill, 1, "Unexpected a kill value, got %d", kill)
 }

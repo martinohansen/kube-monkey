@@ -9,8 +9,6 @@ import (
 	"kube-monkey/internal/pkg/config"
 	"kube-monkey/internal/pkg/kubernetes"
 	"kube-monkey/internal/pkg/victims"
-
-	kube "k8s.io/client-go/kubernetes"
 )
 
 type Chaos struct {
@@ -50,19 +48,21 @@ func (c *Chaos) DurationToKillTime() time.Duration {
 // The result is sent back over the channel provided
 func (c *Chaos) Execute(resultchan chan<- *Result) {
 	// Create kubernetes clientset
-	clientset, _, err := kubernetes.CreateClient()
+	clientset, dynamicClient, err := kubernetes.CreateClient()
 	if err != nil {
 		resultchan <- c.NewResult(err)
 		return
 	}
 
-	err = c.verifyExecution(clientset)
+	victimClient := victims.NewVictimClient(clientset, dynamicClient)
+
+	err = c.verifyExecution(victimClient)
 	if err != nil {
 		resultchan <- c.NewResult(err)
 		return
 	}
 
-	err = c.terminate(clientset)
+	err = c.terminate(victimClient)
 	if err != nil {
 		resultchan <- c.NewResult(err)
 		return
@@ -73,9 +73,9 @@ func (c *Chaos) Execute(resultchan chan<- *Result) {
 }
 
 // Verify if the victim has opted out since scheduling
-func (c *Chaos) verifyExecution(clientset kube.Interface) error {
+func (c *Chaos) verifyExecution(client victims.VictimKubeClient) error {
 	// Is victim still enrolled in kube-monkey
-	enrolled, err := c.Victim().IsEnrolled(clientset)
+	enrolled, err := c.Victim().IsEnrolled(client)
 	if err != nil {
 		return err
 	}
@@ -99,13 +99,13 @@ func (c *Chaos) verifyExecution(clientset kube.Interface) error {
 }
 
 // The termination type and value is processed here
-func (c *Chaos) terminate(clientset kube.Interface) error {
-	killType, err := c.Victim().KillType(clientset)
+func (c *Chaos) terminate(client victims.VictimKubeClient) error {
+	killType, err := c.Victim().KillType(client)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to check KillType label for %s %s", c.Victim().Kind(), c.Victim().Name())
 	}
 
-	killValue, err := c.getKillValue(clientset)
+	killValue, err := c.getKillValue(client)
 
 	// KillAll is the only kill type that does not require a kill-value
 	if killType != config.KillAllLabelValue && err != nil {
@@ -115,32 +115,32 @@ func (c *Chaos) terminate(clientset kube.Interface) error {
 	// Validate killtype
 	switch killType {
 	case config.KillFixedLabelValue:
-		return c.Victim().DeleteRandomPods(clientset, killValue)
+		return c.Victim().DeleteRandomPods(client, killValue)
 	case config.KillAllLabelValue:
-		killNum, err := c.Victim().KillNumberForKillingAll(clientset)
+		killNum, err := c.Victim().KillNumberForKillingAll(client)
 		if err != nil {
 			return err
 		}
-		return c.Victim().DeleteRandomPods(clientset, killNum)
+		return c.Victim().DeleteRandomPods(client, killNum)
 	case config.KillRandomMaxLabelValue:
-		killNum, err := c.Victim().KillNumberForMaxPercentage(clientset, killValue)
+		killNum, err := c.Victim().KillNumberForMaxPercentage(client, killValue)
 		if err != nil {
 			return err
 		}
-		return c.Victim().DeleteRandomPods(clientset, killNum)
+		return c.Victim().DeleteRandomPods(client, killNum)
 	case config.KillFixedPercentageLabelValue:
-		killNum, err := c.Victim().KillNumberForFixedPercentage(clientset, killValue)
+		killNum, err := c.Victim().KillNumberForFixedPercentage(client, killValue)
 		if err != nil {
 			return err
 		}
-		return c.Victim().DeleteRandomPods(clientset, killNum)
+		return c.Victim().DeleteRandomPods(client, killNum)
 	default:
 		return fmt.Errorf("failed to recognize KillType label for %s %s", c.Victim().Kind(), c.Victim().Name())
 	}
 }
 
-func (c *Chaos) getKillValue(clientset kube.Interface) (int, error) {
-	killValue, err := c.Victim().KillValue(clientset)
+func (c *Chaos) getKillValue(client victims.VictimKubeClient) (int, error) {
+	killValue, err := c.Victim().KillValue(client)
 	if err != nil {
 		return 0, errors.Wrapf(err, "Failed to check KillValue label for %s %s", c.Victim().Kind(), c.Victim().Name())
 	}
