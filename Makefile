@@ -1,6 +1,10 @@
 all: test
 
-ENVVAR = GOOS=linux GOARCH=amd64 CGO_ENABLED=0
+GOOS ?= linux
+GOARCH ?= amd64
+CGO_ENABLED ?= 0
+
+ENVVAR = GOOS=$(GOOS) GOARCH=$(GOARCH) CGO_ENABLED=$(CGO_ENABLED)
 GOLANGCI_INSTALLED := $(shell which bin/golangci-lint)
 
 

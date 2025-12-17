@@ -1,11 +1,13 @@
 ########################
 ### Builder          ###
 ########################
-FROM golang:1.21 as builder
+FROM golang:1.24 AS builder
+ARG TARGETOS
+ARG TARGETARCH
 RUN mkdir -p /kube-monkey
 COPY ./ /kube-monkey/
 WORKDIR /kube-monkey
-RUN make build
+RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} make build
 
 ########################
 ### Final            ###
